@@ -1,43 +1,15 @@
+#ifndef _PATHPLANNER_H_
+#define _PATHPLANNER_H_
+
 #include <iostream>
 #include <vector>
 #include "util.h"
 #include "spline.h"
+#include "BehaviorPlanner.h"
 
 using namespace std;
 
 
-enum CarData
-{
-  X_POS,
-  Y_POS,
-  S_POS,
-  D_POS,
-  YAW,
-  SPEED,
-  MAX_CARDATA
-};
-
-enum MapData
-{
-  X_WAY,
-  Y_WAY,
-  S_WAY,
-  DX_WAY,
-  DY_WAY,
-  MAX_MAPDATA
-};
-
-enum SensorData
-{
-  SENS_ID,
-  SENS_X,
-  SENS_Y,
-  SENS_VX,
-  SENS_VY,
-  SENS_S,
-  SENS_D,
-  MAX_SENS
-};
 
 class PathPlanner
 {
@@ -399,4 +371,4 @@ PathPlanner::PlanPath
 
 
 
-
+#endif //_PATHPLANNER_H_

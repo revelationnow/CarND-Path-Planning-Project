@@ -1,3 +1,6 @@
+#ifndef _UTIL_H_
+#define _UTIL_H_
+
 #include <iostream>
 
 using namespace std;
@@ -21,15 +24,59 @@ using namespace std;
 
 #define OUTPUT_MSG_ERROR(...) __OUTPUT_MSG(ERROR, __VA_ARGS__)
 
+/* Enumerations for the car data vector fields */
+enum CarData
+{
+  X_POS,
+  Y_POS,
+  S_POS,
+  D_POS,
+  YAW,
+  SPEED,
+  MAX_CARDATA
+};
 
-// For converting back and forth between radians and degrees.
+/* Enumerations for the Map data vector fields */
+enum MapData
+{
+  X_WAY,
+  Y_WAY,
+  S_WAY,
+  DX_WAY,
+  DY_WAY,
+  MAX_MAPDATA
+};
+
+/* Enumerations for the sensor data vector fields */
+enum SensorData
+{
+  SENS_ID,
+  SENS_X,
+  SENS_Y,
+  SENS_VX,
+  SENS_VY,
+  SENS_S,
+  SENS_D,
+  MAX_SENS
+};
+
+
+/* Value of PI */
 constexpr double pi() { return M_PI; }
+
+/* Convert Degrees to Radians */
 double deg2rad(double x) { return x * pi() / 180; }
+
+/* Convert Radians to Degrees */
 double rad2deg(double x) { return x * 180 / pi(); }
+
+/* Calculate distance between two points given the cartesian coordinates */
 double distance(double x1, double y1, double x2, double y2)
 {
 	return sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1));
 }
+
+/* Find the closest waypoint to a given point in the map */
 int ClosestWaypoint(double x, double y, vector<double> maps_x, vector<double> maps_y)
 {
 
@@ -53,6 +100,7 @@ int ClosestWaypoint(double x, double y, vector<double> maps_x, vector<double> ma
 
 }
 
+/* Find the next waypoint given a point and heading */
 int NextWaypoint(double x, double y, double theta, vector<double> maps_x, vector<double> maps_y)
 {
 
@@ -74,7 +122,7 @@ int NextWaypoint(double x, double y, double theta, vector<double> maps_x, vector
 
 }
 
-// Transform from Cartesian x,y coordinates to Frenet s,d coordinates
+/* Transform from Cartesian x,y coordinates to Frenet s,d coordinates */
 vector<double> getFrenet(double x, double y, double theta, vector<double> maps_x, vector<double> maps_y)
 {
 	int next_wp = NextWaypoint(x,y, theta, maps_x,maps_y);
@@ -123,7 +171,7 @@ vector<double> getFrenet(double x, double y, double theta, vector<double> maps_x
 
 }
 
-// Transform from Frenet s,d coordinates to Cartesian x,y
+/* Transform from Frenet s,d coordinates to Cartesian x,y */
 vector<double> getXY(double s, double d, vector<double> maps_s, vector<double> maps_x, vector<double> maps_y)
 {
 	int prev_wp = -1;
@@ -151,9 +199,9 @@ vector<double> getXY(double s, double d, vector<double> maps_s, vector<double> m
 
 }
 
+/* Convert Miles per hour to metres per second */
 double convert_MPH_to_mps(double MPH)
 {
-  double mps = MPH * 1600 / 3600;
-  return mps;
+  return (MPH * 1600) / 3600;
 }
-
+#endif //_UTIL_H_
