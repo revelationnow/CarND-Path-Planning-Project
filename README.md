@@ -21,6 +21,8 @@ generate a new decision.
 Diagnostic utilities and lane number detection utilities were added to ease the development process.
 The car's vicinity has been divided into a Caution Zone and a Danger Zone. The Danger zone as the name implies triggers a panic reaction to try to significantly reduce the velocity of the vehicle, while the caution zone asks the vehicle to start tracking the velocity of the vehicle in front of it, while reducing speed a little to escape the caution zone and look for opportunities for a lane change if possible.
 
+An Output from tests on my computer can be seen here:
+https://youtu.be/lemZzZKivF8
 
 ### Simulator. You can download the Term3 Simulator BETA which contains the Path Planning Project from the [releases tab](https://github.com/udacity/self-driving-car-sim/releases).
 
