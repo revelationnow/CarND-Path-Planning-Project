@@ -1,6 +1,27 @@
 # CarND-Path-Planning-Project
 Self-Driving Car Engineer Nanodegree Program
    
+
+### Writeup
+
+The Code has been structured into two parts, one is the PathPlanner Class and the other is the behaviour Planner class.
+The Path planner is responsible for trajectory generation, while the BehaviorPlanner generates the long term behaviours.
+The path planner starts off from the advise in the walkthrough video, where the car is first transformed into its own coordinate space and then the next 50 waypoints are identified and then fitted with a spline.
+Deviations from the walkthrough include:
+1. A kinematics model for acceleration and jerk is used to identify the waypoints on the spline that will be visited.
+2. Acceleration is limited to a value proportional to the difference in current velocity and the velocity we wish to achieve. Maximum deceleration is also thus limited, however in case the car is in a so called danger zone, full acceleration is permitted to avoid any collision.
+3. Maximum jerk is permitted all through
+4. During Lane changes, the target lane and current lane are analyzed to sense for danger, if there is no danger, a lane change is initiated and will be completed.
+5. During lane changes, to reduce tangential acceleration, the target x position is increased to 50.
+6. An attempt was made to use frenet coordinates to generate the waypoints and corresponding spline to ensure that all points generated fall within target x. Without it some points will go past target x if the velocity is high, however the computation would have increased quite a bit, while the benefits were not significant.
+
+The Behaviour Planner uses a cost based mechanism to identify the best course of action. It looks at the cars in the different lanes and identifies a best lane to move to. Cars closer to the ego car will cause the cost to jump up. Also arbitrarily high costs are assigned to lanes not reachable in a single lane change, this can be augmented in future efforts to allow intermediate high cost lanes in order to make a way to a low cost lane.The behaviour planner is invoked every 100 frames to
+generate a new decision.
+
+Diagnostic utilities and lane number detection utilities were added to ease the development process.
+The car's vicinity has been divided into a Caution Zone and a Danger Zone. The Danger zone as the name implies triggers a panic reaction to try to significantly reduce the velocity of the vehicle, while the caution zone asks the vehicle to start tracking the velocity of the vehicle in front of it, while reducing speed a little to escape the caution zone and look for opportunities for a lane change if possible.
+
+
 ### Simulator. You can download the Term3 Simulator BETA which contains the Path Planning Project from the [releases tab](https://github.com/udacity/self-driving-car-sim/releases).
 
 In this project your goal is to safely navigate around a virtual highway with other traffic that is driving +-10 MPH of the 50 MPH speed limit. You will be provided the car's localization and sensor fusion data, there is also a sparse map list of waypoints around the highway. The car should try to go as close as possible to the 50 MPH speed limit, which means passing slower traffic when possible, note that other cars will try to change lanes too. The car should avoid hitting other cars at all cost as well as driving inside of the marked road lanes at all times, unless going from one lane to another. The car should be able to make one complete loop around the 6946m highway. Since the car is trying to go 50 MPH, it should take a little over 5 minutes to complete 1 loop. Also the car should not experience total acceleration over 10 m/s^2 and jerk that is greater than 50 m/s^3.
