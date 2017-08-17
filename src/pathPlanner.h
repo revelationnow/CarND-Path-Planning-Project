@@ -1,15 +1,26 @@
 #ifndef _PATHPLANNER_H_
 #define _PATHPLANNER_H_
 
+/*======================================================================================================================
+                                                    HEADER FILES
+======================================================================================================================*/
 #include <iostream>
 #include <vector>
+#include <array>
+#include <limits>
 #include "util.h"
 #include "spline.h"
 #include "BehaviorPlanner.h"
 
+/*======================================================================================================================
+                                                     NAMESPACES
+======================================================================================================================*/
 using namespace std;
 
 
+/*======================================================================================================================
+                                                  CLASS DECLARATION
+======================================================================================================================*/
 
 class PathPlanner
 {
@@ -35,6 +46,8 @@ class PathPlanner
     double _lane_width;
 
     double _ts; /*!< Time step */
+
+    BehaviorPlanner *_B;
 
   public:
     PathPlanner()
@@ -121,6 +134,8 @@ class PathPlanner
         _prev_acc[i] = 0;
       }
 
+      _B = new BehaviorPlanner(100, max_speed, LANE_MID, _lane_width);
+
       OUTPUT_MSG(INFO,"Set the max limits : Max speed="<<_max_speed<<
                       ", Max Acc="<<_max_acc<<
                       ", Max Jerk="<<_max_jerk<<
@@ -140,12 +155,6 @@ class PathPlanner
       return s;
     }
 
-    double DToLaneNum(double d)
-    {
-      return (double)((int)d/4);
-    }
-
-
     void PlanPath(
         vector<double> &next_x,
         vector<double> &next_y,
@@ -161,45 +170,65 @@ class PathPlanner
     void BuildSpline(
         vector<double> prev_x,
         vector<double> prev_y,
-        double lane,
+        LanesEnum cur_lane,
+        LanesEnum targ_lane,
         tk::spline &s_out,
         double &ref_x,
         double &ref_y,
         double &ref_yaw
         );
 
-    void GetNextPointVel(double &cur_point_vel, double &cur_point_acc, double prev_point_vel, double prev_point_acc, double ref_vel)
+    void GetNextPointVel(double &cur_point_vel, double &cur_point_acc, double prev_point_vel, double prev_point_acc, double ref_vel, double min_dist)
     {
-      double max_acc_to_use = _max_acc * ((ref_vel - prev_point_vel)/ref_vel);
-      double max_jerk_to_use = _max_jerk * ((ref_vel - prev_point_vel)/ref_vel);
+      double max_acc_to_use = _max_acc * fabs((ref_vel - prev_point_vel)/ref_vel);
+
+      if(min_dist < 0.5 * _danger_zone)
+        max_acc_to_use = _max_acc;
+
+      double max_jerk_to_use = _max_jerk;// * fabs((ref_vel - prev_point_vel)/ref_vel);
       if(prev_point_vel < ref_vel)
       {
         cur_point_acc = min(prev_point_acc + max_jerk_to_use * _ts, max_acc_to_use);
-        cur_point_vel = min(prev_point_vel + prev_point_acc * _ts + (0.5 * max_jerk_to_use * _ts * _ts), _max_speed);
+        cur_point_vel = min(min(prev_point_vel + prev_point_acc * _ts + (0.5 * max_jerk_to_use * _ts * _ts), _max_speed),ref_vel);
       }
       else
       {
         cur_point_acc = max(prev_point_acc - max_jerk_to_use * _ts, -max_acc_to_use);
-        cur_point_vel = max(prev_point_vel + prev_point_acc * _ts - (0.5 * max_jerk_to_use * _ts * _ts), -_max_speed);
+        cur_point_vel = max(max(prev_point_vel + prev_point_acc * _ts - (0.5 * max_jerk_to_use * _ts * _ts), -_max_speed),-ref_vel);
       }
+
+      if(cur_point_vel > 0)
+      {
+        cur_point_vel = min(cur_point_vel,_max_speed);
+      }
+      else
+      {
+        cur_point_vel = max(cur_point_vel, -_max_speed);
+      }
+
     }
 
-    int PredictedLane(vector<double> sensor_data)
+    bool PredictedLane(vector<double> sensor_data, LanesEnum lane)
     {
-      return (int)(sensor_data[SENS_D]/_lane_width);
+      double car_d = LaneToD(lane, _lane_width);
+      if(fabs(car_d - sensor_data[SENS_D]) < 0.8 * _lane_width )
+        return true;
+      return false;
+
+//      return (DToLane(sensor_data[SENS_D],_lane_width));
     }
 
-    double SetSplineLaneByDanger(double target_lane, double curr_lane, vector< vector<double> > sensor_data)
+    LanesEnum SetSplineLaneByDanger(LanesEnum target_lane, LanesEnum curr_lane, vector< vector<double> > sensor_data)
     {
       if(target_lane == curr_lane)
         return curr_lane;
 
       for(int i = 0; i < sensor_data.size(); i++)
       {
-        if(PredictedLane(sensor_data[i]) == (int)target_lane)
+        if(true == PredictedLane(sensor_data[i], target_lane))
         {
           double distance = fabs(_car_data[S_POS] - sensor_data[i][SENS_S]);
-          if(distance < _caution_zone)
+          if(distance < _danger_zone)
           {
             return curr_lane;
           }
@@ -208,29 +237,67 @@ class PathPlanner
       return target_lane;
     }
 
-    double LaneToD(double lane)
+    double GetRefVelBasedOnSensor(double original_ref_vel, LanesEnum lane, vector< vector<double> > sensor_data, double &min_dist)
     {
-      return (_lane_width/2) + (_lane_width * lane);
+      for(int i = 0; i < sensor_data.size(); i++)
+      {
+        if((true  == PredictedLane(sensor_data[i], lane)) && (_car_data[S_POS] < sensor_data[i][SENS_S]))
+        {
+          double distance = fabs(_car_data[S_POS] - sensor_data[i][SENS_S]);
+          double sensor_car_s_speed = sqrt((sensor_data[i][SENS_VX] * sensor_data[i][SENS_VX]) + (sensor_data[i][SENS_VY] * sensor_data[i][SENS_VY]));
+          if(distance < min_dist)
+          {
+            min_dist = distance;
+          }
+          if(distance < _danger_zone)
+          {
+            OUTPUT_MSG(DEBUG, "!!!!! In Danger Zone : car_s : "<<_car_data[S_POS]<<", other_car_s : "<<sensor_data[i][SENS_S]);
+            OUTPUT_MSG(DEBUG, "Original Ref Vel : "<<original_ref_vel<<", sensor_car_s_speed * 0.7 : "<<sensor_car_s_speed * 0.7);
+            return min(original_ref_vel, sensor_car_s_speed * 0.7);
+          }
+          if(distance < _caution_zone)
+          {
+            //OUTPUT_MSG(DEBUG, "!! In Caution Zone : car_s : "<<_car_data[S_POS]<<", other_car_s : "<<sensor_data[i][SENS_S]);
+            //OUTPUT_MSG(DEBUG, "Original Ref Vel : "<<original_ref_vel<<", sensor_car_s_speed : "<<sensor_car_s_speed);
+            return min(original_ref_vel, sensor_car_s_speed * 0.9 );
+          }
+        }
+      }
+      return original_ref_vel;
     }
 
 };
 
+/*======================================================================================================================
+                                              CLASS FUNCTION DEFINITIONS
+======================================================================================================================*/
+/*--------------------------------------------------------------------------------------------------------------------*/
 void
 PathPlanner::BuildSpline
 (
  vector<double> prev_x,
  vector<double> prev_y,
- double lane,
+ LanesEnum curr_lane,
+ LanesEnum targ_lane,
  tk::spline &s_out,
  double &ref_x,
  double &ref_y,
  double &ref_yaw
 )
 {
+  array<int, 3> way_point_offsets = {30, 60, 90};
+
+  if(curr_lane != targ_lane)
+  {
+    way_point_offsets[0] = 50;
+    way_point_offsets[1] = 100;
+    way_point_offsets[2] = 150;
+  }
+
   /* Pick 3 way points in the distance */
-  vector<double> wp0 = getXY(_car_data[S_POS] + 30, LaneToD(lane), _map_data[S_WAY], _map_data[X_WAY], _map_data[Y_WAY]);
-  vector<double> wp1 = getXY(_car_data[S_POS] + 60, LaneToD(lane), _map_data[S_WAY], _map_data[X_WAY], _map_data[Y_WAY]);
-  vector<double> wp2 = getXY(_car_data[S_POS] + 90, LaneToD(lane), _map_data[S_WAY], _map_data[X_WAY], _map_data[Y_WAY]);
+  vector<double> wp0 = getXY(_car_data[S_POS] + way_point_offsets[0], LaneToD(targ_lane, _lane_width), _map_data[S_WAY], _map_data[X_WAY], _map_data[Y_WAY]);
+  vector<double> wp1 = getXY(_car_data[S_POS] + way_point_offsets[1], LaneToD(targ_lane, _lane_width), _map_data[S_WAY], _map_data[X_WAY], _map_data[Y_WAY]);
+  vector<double> wp2 = getXY(_car_data[S_POS] + way_point_offsets[2], LaneToD(targ_lane, _lane_width), _map_data[S_WAY], _map_data[X_WAY], _map_data[Y_WAY]);
 
   /* Create a spline for these three way points */
   vector<double> ptsx, ptsy;
@@ -279,6 +346,7 @@ PathPlanner::BuildSpline
 
 
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 void
 PathPlanner::PlanPath
 (
@@ -299,46 +367,78 @@ PathPlanner::PlanPath
   }
 
   /* Update behaviour planner with speed in previous points*/
+  double point_vel = _prev_speed[prev_x.size() + 1];
+  double point_acc = _prev_acc[prev_x.size() + 1];
+  LanesEnum curr_lane    = DToLane(_car_data[D_POS], _lane_width);
+
+
 
 
   /* Get a reference velocity and lane command from behaviour planner */
-  double ref_vel = _max_speed;
-  double point_vel = _prev_speed[prev_x.size()];
-  double point_acc = _prev_acc[prev_x.size()];
-  double curr_lane    = DToLaneNum(_car_data[D_POS]);
-  double target_lane  = curr_lane;
+  double ref_vel = _B->GetRefSpeed();
+  LanesEnum target_lane  = _B->GetTargetLane();
+  LanesEnum curr_beh_lane = _B->GetCurrentLane();
   double ref_x;
   double ref_y;
   double ref_yaw;
   tk::spline s;
+  double min_dist;
 
-  /* If target lane is not dangerous, build spline to target lane, else to current lane */
-  double spline_lane = SetSplineLaneByDanger(target_lane, curr_lane, sensor_data);
+  /* If target lane is not dangerous, build spline to target lane, else to current lane
+   * However if lane change has been initiated, complete it by usign the curr_beh_lane
+   */
+  LanesEnum spline_lane = SetSplineLaneByDanger(target_lane, curr_lane, sensor_data);
+  if(curr_lane != curr_beh_lane)
+  {
+    /* Lane change was started previously, complete it */
+    spline_lane = curr_beh_lane;
+  }
 
+  /* Build the spline based on the lane set according to danger conditions */
+  BuildSpline(prev_x, prev_y, curr_lane, spline_lane, s, ref_x, ref_y, ref_yaw);
 
-
-  BuildSpline(prev_x, prev_y, spline_lane, s, ref_x, ref_y, ref_yaw);
+#if 0
+  if(spline_lane != curr_lane)
+  {
+    _B->SetCurrentLane(spline_lane);
+  }
+#else
+  _B->UpdateBehaviour(point_vel, spline_lane, sensor_data, _car_data[S_POS]);
+#endif
 
   /* Based on reference velocity pick points along the spline as inputs */
   double target_x = 30.0;
+  if(curr_lane != spline_lane)
+    target_x = 60;
   double target_y = s(target_x);
   double target_dist = sqrt((target_x*target_x) + (target_y * target_y));
 
   double x_add_on = 0;
-
-  OUTPUT_MSG(DEBUG, "Point vel = "<<point_vel<<", Point acc = "<<point_acc);
-  for(int i = 1; i <= 50 - prev_x.size(); i++)
+  double s_add_on = _car_data[S_POS];
+  if(prev_x.size() >= 1)
   {
-    /* Check sensor fusion data to see if any cars are nearby */
+    vector<double> prev_s = getFrenet(prev_x[prev_x.size() - 1], prev_y[prev_y.size()-1], ref_yaw, _map_data[X_WAY], _map_data[Y_WAY]);
+    s_add_on = prev_s[0];
+  }
 
+//  OUTPUT_MSG(DEBUG, "Point vel = "<<point_vel<<", Point acc = "<<point_acc);
+  for(int i = 1; i <= _max_wayp - prev_x.size(); i++)
+  {
+    min_dist = numeric_limits<double>::max();
+    /* Check sensor fusion data to see if any cars are nearby */
+    /* Start reducing speed to speed of car in fromt if in caution zone */
+    /* Reduce even more if in danger zone */
+    ref_vel = min(GetRefVelBasedOnSensor(ref_vel, spline_lane , sensor_data, min_dist),
+                  GetRefVelBasedOnSensor(ref_vel, curr_lane , sensor_data, min_dist)
+                 );
 
     /* Apply equations of motion for max acceleration without violating jerk */
-    GetNextPointVel(point_vel, point_acc, point_vel, point_acc, ref_vel);
-    OUTPUT_MSG(DEBUG, "Point vel = "<<point_vel<<", Point acc = "<<point_acc);
+    GetNextPointVel(point_vel, point_acc, point_vel, point_acc, ref_vel, min_dist);
+    OUTPUT_MSG(DEBUG, "Point vel = "<<point_vel<<", Point acc = "<<point_acc<<", Ref Vel = "<<ref_vel);
+#if 1
     double N = (target_dist/(_ts * point_vel));
     double x_point = x_add_on + (target_x/N);
     double y_point = s(x_point);
-
     x_add_on = x_point;
 
     double x_point_temp = x_point;
@@ -350,6 +450,24 @@ PathPlanner::PlanPath
     next_x.push_back(x_point);
     next_y.push_back(y_point);
 
+#else
+    double next_s = s_add_on + (point_vel * _ts) + (0.5 * point_acc * _ts * _ts) + (_max_jerk * _ts * _ts * _ts / 6);
+//    next_s = LimitS(next_s);
+    vector<double> xy_temp = getXY(next_s, LaneToD(spline_lane, _lane_width), _map_data[S_WAY], _map_data[X_WAY], _map_data[Y_WAY] );
+    double x_point = xy_temp[0];
+    double y_point = xy_temp[1];
+    OUTPUT_MSG(DEBUG, "next_s = "<<next_s<<
+                      ", point_vel = "<<point_vel<<
+                      ", point_acc = "<<point_acc<<
+                      ", s_add_on = "<<s_add_on
+                      );
+
+    s_add_on = next_s;
+
+    next_x.push_back(x_point);
+    next_y.push_back(y_point);
+
+#endif
     _last_acc = point_acc;
     _prev_speed[prev_x.size() + i] = point_vel;
     _prev_acc[prev_x.size() + i] = point_acc;

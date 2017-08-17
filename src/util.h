@@ -1,11 +1,20 @@
 #ifndef _UTIL_H_
 #define _UTIL_H_
 
+/*======================================================================================================================
+                                                    HEADER FILES
+======================================================================================================================*/
 #include <iostream>
 
+/*======================================================================================================================
+                                                     NAMESPACES
+======================================================================================================================*/
 using namespace std;
 
 
+/*======================================================================================================================
+                                                CONSTANTS AND MACROS
+======================================================================================================================*/
 #define STRING(x) #x
 #define STRINGIFY(x) STRING(x)
 #define __OUTPUT_MSG(level, ...) cout<< #level " : " __FILE__ ":" STRINGIFY(__LINE__) " == " <<__VA_ARGS__<<endl
@@ -14,7 +23,11 @@ using namespace std;
 #define OUTPUT_MSG(level, ...) OUTPUT_MSG_##level(__VA_ARGS__)
 
 
+#ifdef FEATURE_INFO
 #define OUTPUT_MSG_INFO(...) __OUTPUT_MSG(INFO, __VA_ARGS__)
+#else
+#define OUTPUT_MSG_INFO(...)
+#endif
 
 #ifdef FEATURE_DEBUG
 #define OUTPUT_MSG_DEBUG(...) __OUTPUT_MSG(DEBUG, __VA_ARGS__)
@@ -24,6 +37,9 @@ using namespace std;
 
 #define OUTPUT_MSG_ERROR(...) __OUTPUT_MSG(ERROR, __VA_ARGS__)
 
+/*======================================================================================================================
+                                                    ENUMERATIONS
+======================================================================================================================*/
 /* Enumerations for the car data vector fields */
 enum CarData
 {
@@ -60,22 +76,39 @@ enum SensorData
   MAX_SENS
 };
 
+/* Enumerations for different lanes */
+enum LanesEnum
+{
+  LANE_LEFT,
+  LANE_MID,
+  LANE_RIGHT,
+  LANE_MAX
+};
+
+/*======================================================================================================================
+                                     FUNCTION PROTOTYPES AND DEFINITIONS
+======================================================================================================================*/
 
 /* Value of PI */
 constexpr double pi() { return M_PI; }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
+
 /* Convert Degrees to Radians */
 double deg2rad(double x) { return x * pi() / 180; }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 /* Convert Radians to Degrees */
 double rad2deg(double x) { return x * 180 / pi(); }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 /* Calculate distance between two points given the cartesian coordinates */
 double distance(double x1, double y1, double x2, double y2)
 {
 	return sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1));
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 /* Find the closest waypoint to a given point in the map */
 int ClosestWaypoint(double x, double y, vector<double> maps_x, vector<double> maps_y)
 {
@@ -100,6 +133,7 @@ int ClosestWaypoint(double x, double y, vector<double> maps_x, vector<double> ma
 
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 /* Find the next waypoint given a point and heading */
 int NextWaypoint(double x, double y, double theta, vector<double> maps_x, vector<double> maps_y)
 {
@@ -122,6 +156,7 @@ int NextWaypoint(double x, double y, double theta, vector<double> maps_x, vector
 
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 /* Transform from Cartesian x,y coordinates to Frenet s,d coordinates */
 vector<double> getFrenet(double x, double y, double theta, vector<double> maps_x, vector<double> maps_y)
 {
@@ -171,6 +206,7 @@ vector<double> getFrenet(double x, double y, double theta, vector<double> maps_x
 
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 /* Transform from Frenet s,d coordinates to Cartesian x,y */
 vector<double> getXY(double s, double d, vector<double> maps_s, vector<double> maps_x, vector<double> maps_y)
 {
@@ -199,9 +235,25 @@ vector<double> getXY(double s, double d, vector<double> maps_s, vector<double> m
 
 }
 
+/*--------------------------------------------------------------------------------------------------------------------*/
 /* Convert Miles per hour to metres per second */
 double convert_MPH_to_mps(double MPH)
 {
   return (MPH * 1600) / 3600;
 }
+/*--------------------------------------------------------------------------------------------------------------------*/
+/* Convert Frenet D coordinate to a Lane type */
+LanesEnum DToLane(double d, double lane_width)
+{
+  return (LanesEnum)(int)(d/lane_width);
+}
+
+/*--------------------------------------------------------------------------------------------------------------------*/
+/* Convert Lane to Frenet D coordinate for middle of lane */
+double LaneToD(LanesEnum lane, double lane_width)
+{
+  return ((lane_width/2) + (lane_width * (int)lane));
+}
+
+
 #endif //_UTIL_H_

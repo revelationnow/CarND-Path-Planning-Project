@@ -72,8 +72,8 @@ int main() {
   }
 
   P.SetMapData(map_waypoints_x, map_waypoints_y, map_waypoints_s, map_waypoints_dx, map_waypoints_dy);
-  P.SetMaxLimits(convert_MPH_to_mps(49), 10, 10, 50, 0.02, max_s,4);
-  P.SetZoneLimits(50, 10);
+  P.SetMaxLimits(convert_MPH_to_mps(49.5), 10, 10, 50, 0.02, max_s, 4);
+  P.SetZoneLimits(50, 30);
 
   h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, &P](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
